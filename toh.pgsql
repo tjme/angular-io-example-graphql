@@ -29,3 +29,5 @@ INSERT INTO hero (id, name) OVERRIDING SYSTEM VALUE VALUES
     (18,'Dr IQ'),
     (19,'Magma'),
     (20,'Tornado');
+
+ALTER SEQUENCE hero_id_seq RESTART WITH 21;

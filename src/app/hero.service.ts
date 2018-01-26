@@ -37,7 +37,7 @@ export class HeroService {
 
   /** Get all heroes from the server */
   getHeroes (): Observable<Hero[]> {
-    return this.apollo.query<{allHeroes:{nodes:Hero[]}}>({query: allHeroes}).pipe(
+    return this.apollo.watchQuery<{allHeroes:{nodes:Hero[]}}>({query: allHeroes}).valueChanges.pipe(
         map(({data})=>data.allHeroes.nodes),
         tap(heroes => this.log(`fetched heroes`)),
         catchError(this.handleError('getHeroes', []))
