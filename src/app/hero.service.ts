@@ -11,123 +11,72 @@ import { catchError, map, tap } from 'rxjs/operators';
 
 import { Hero } from './hero';
 import { MessageService } from './message.service';
-import { validateConfig } from '@angular/router/src/config';
+import { GraphQLService, GQLOptions } from './graphql.service';
 
-const heroesUrl = 'http://localhost:5000/graphql';  // URL to web api
-const allHeroes=gql`query tohAllHero{allHeroes{nodes{id,name}}}`;
-const heroById=gql`query tohHeroByID($id:Int!){heroById(id:$id){id,name}}`;
-const heroWithTerm=gql`query tohHeroWithTerm($term:String!){herowithterm(term:$term){nodes{id,name}}}`;
-const createHero=gql`mutation tohCreateHero($name:String!){createHero(input:{clientMutationId:"toh-createHero",hero:{name:$name}}){clientMutationId,hero{id,name}}}`;
-const updateHero=gql`mutation tohUpdateHeroById($id:Int!,$name:String!){updateHeroById(input:{clientMutationId:"toh-updateHero",id:$id,heroPatch:{name:$name}}){clientMutationId,hero{id,name}}}`;
-const deleteHero=gql`mutation tohDeleteHeroById($id:Int!){deleteHeroById(input:{clientMutationId:"toh-deleteHero",id:$id}){clientMutationId,hero{id,name}}}`;
+const options: GQLOptions = {
+  readAll: gql`query readAll{allHeroes{nodes{id,name}}}`,
+  readById: gql`query readById($id:Int!){heroById(id:$id){id,name}}`,
+  readWithTerm: gql`query readWithTerm($term:String!){allHeroes(term:$term){nodes{id,name}}}`,
+  create: gql`mutation create($name:String!)
+    {createHero(input:{clientMutationId:"toh-createHero",hero:{name:$name}})
+      {clientMutationId,hero{id,name}}}`,
+  update: gql`mutation update($id:Int!,$name:String!)
+    {updateHeroById(input:{clientMutationId:"toh-updateHero",id:$id,heroPatch:{name:$name}})
+      {clientMutationId,hero{id,name}}}`,
+  delete: gql`mutation delete($id:Int!)
+    {deleteHeroById(input:{clientMutationId:"toh-deleteHero",id:$id})
+      {clientMutationId,hero{id,name}}}`,
+  deleteById: gql`mutation deleteById($id:Int!)
+    {deleteHeroById(input:{clientMutationId:"toh-deleteHeroById",id:$id})
+      {clientMutationId,hero{id,name}}}`
+};
 
 @Injectable()
 export class HeroService {
 
   constructor(
-    private messageService: MessageService,
-    private apollo: Apollo,
-    private httpLink: HttpLink
-  ) {
-    apollo.create({
-      link: httpLink.create({ uri: heroesUrl }),
-      cache: new InMemoryCache()
-    });
-  }
+    private graphQLService: GraphQLService
+  ) { }
 
   /** Get all heroes from the server */
   getHeroes (): Observable<Hero[]> {
-    return this.apollo.subscribe({query: allHeroes}).pipe(
-        map(({data})=>data.allHeroes.nodes),
-        tap(heroes => this.log(`fetched heroes`)),
-        catchError(this.handleError('getHeroes', []))
-      );
-  }
-
-  /** Get a hero by id. Return `undefined` when id not found */
-  getHeroNo404<Data>(id: number): Observable<Hero> {
-    return this.apollo.query<{heroById:Hero}>({query: heroById, variables: {id: id}}).pipe(
-        map(({data}) => data.heroById), // returns a {0|1} element array
-        tap(h => {
-          const outcome = h ? `fetched` : `did not find`;
-          this.log(`${outcome} hero id=${id}`);
-        }),
-        catchError(this.handleError<Hero>(`getHero id=${id}`))
-      );
+    return this.graphQLService.readAll<{allHeroes:{nodes:Hero[]}}>(options).pipe(
+      map((data) => data.allHeroes.nodes))
   }
 
   /** Get a hero by id. Will 404 if id not found */
   getHero(id: number): Observable<Hero> {
-    return this.apollo.query<{heroById:Hero}>({query: heroById, variables: {id: id}}).pipe(
-      map(({data}) => data.heroById), // returns a {0|1} element array
-      tap(_ => this.log(`fetched hero id=${id}`)),
-        catchError(this.handleError<Hero>(`getHero id=${id}`))
-      );
+    return this.graphQLService.readById<{heroById:Hero}>(options, id).pipe(
+      map((data) => data.heroById))
   }
 
   /* Get all heroes whose name contains search term */
   searchHeroes(term: string): Observable<Hero[]> {
-    if (!term.trim()) {
-      // if not search term, return empty hero array.
-      return of([]);
-    }
-    return this.apollo.watchQuery<{herowithterm:{nodes:Hero[]}}>({query: heroWithTerm, variables: {term: term}}).valueChanges.pipe(
-      map(({data})=>data.herowithterm.nodes),
-      tap(_ => this.log(`found heroes matching "${term}"`)),
-      catchError(this.handleError<Hero[]>('searchHeroes', []))
-    );
+    if (!term.trim()) {return of([]);} // if not search term, return empty hero array.
+    return this.graphQLService.readWithTerm<{allHeroes:{nodes:Hero[]}}>(options, term).pipe(
+      map((data) => data.allHeroes.nodes))
   }
 
   //////// Save methods //////////
 
   /** Add a new hero to the server */
   addHero (hero: Hero): Observable<Hero> {
-    return this.apollo.mutate<{createHero:{hero:Hero}}>({mutation: createHero, variables: {name: hero.name}}).pipe(
-      map(({data}) => data.createHero.hero), // returns a {0|1} element array
-      tap(_ => this.log(`added hero id=${_.id}`)),
-      catchError(this.handleError<Hero>('addHero'))
-    );
+    return this.graphQLService.create<{createHero:{hero:Hero}}>(options, hero).pipe(
+      map((data) => data.createHero.hero))
   }
 
   /** Delete the hero from the server */
   deleteHero (hero: Hero | number): Observable<Hero> {
     const id = typeof hero === 'number' ? hero : hero.id;
-    return this.apollo.mutate({mutation: deleteHero, variables: {id: id}}).pipe(
-      tap(_ => this.log(`deleted hero id=${id}`)),
-      catchError(this.handleError<Hero>('deleteHero'))
-    );
+    return this.graphQLService.delete<{deleteHeroById:{hero:Hero}}>(options, {"id": id}).pipe(
+      map((data) => data.deleteHeroById.hero))
   }
+
 
   /** Update the hero on the server */
   updateHero (hero: Hero): Observable<Hero> {
-    return this.apollo.mutate({mutation:updateHero, variables: hero}).pipe(
-      tap(_ => this.log(`updated hero id=${hero.id} new name=${hero.name}`)),
-      catchError(this.handleError<Hero>('updateHero'))
-    );
+    return this.graphQLService.update<{updateHeroById:{hero:Hero}}>(options, hero).pipe(
+      map((data) => data.updateHeroById.hero))
   }
 
-  /**
-   * Handle Http operation that failed.
-   * Let the app continue.
-   * @param operation - name of the operation that failed
-   * @param result - optional value to return as the observable result
-   */
-  private handleError<T> (operation = 'operation', result?: T) {
-    return (error: any): Observable<T> => {
-
-      // TODO: send the error to remote logging infrastructure
-      console.error(error); // log to console instead
-
-      // TODO: better job of transforming error for user consumption
-      this.log(`${operation} failed: ${error.message} no: ${error.number}`);
-
-      // Let the app keep running by returning an empty result.
-      return of(result as T);
-    };
-  }
-
-  /** Log a HeroService message with the MessageService */
-  private log(message: string) {
-    this.messageService.add('HeroService: ' + message);
-  }
 }

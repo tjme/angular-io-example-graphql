@@ -1,6 +1,6 @@
 {
   "name": "angular-io-example-graphql",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": false,
   "description": "Example Tour of Heroes project from an angular.io guide, but using a real relational database server (PostgreSQL), via GraphQL (generated using PostGraphile).",
   "scripts": {
@@ -30,7 +30,7 @@
     "apollo-angular": "^1.0.1",
     "apollo-angular-link-http": "^1.0.1",
     "apollo-cache-inmemory": "^1.1.5",
-    "apollo-client": "^2.2.0",
+    "apollo-client": "^2.2.2",
     "core-js": "^2.4.1",
     "graphql": "^0.12.3",
     "graphql-tag": "^2.6.1",
