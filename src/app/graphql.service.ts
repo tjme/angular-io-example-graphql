@@ -11,16 +11,6 @@ import {MessageService} from './message.service';
 
 export const GraphQLUrl = 'http://localhost:5000/graphql';  // URL to web api
 
-export interface GQLOptions {
-  readAll: any;
-  readById: any;
-  readWithTerm: any;
-  create: any;
-  update: any;
-  delete: any;
-  deleteById: any;
-}
-
 @Injectable()
 export class GraphQLService {
 
@@ -35,69 +25,21 @@ export class GraphQLService {
     });
   }
 
-  /** Read all records from the server */
-  readAll<T>(options: GQLOptions): Observable<T> {
-    return this.apollo.subscribe({query: options.readAll}).pipe(
-        map(({data}) => data),
-        tap(_ => this.log(`read all`)),
-        catchError(this.handleError<T>('readAll'))
-      );
-  }
-
-  /** Read a record by id. Will 404 if id not found */
-  readById<T>(options: GQLOptions, id: any): Observable<T> {
-    return this.apollo.query<T>({query: options.readById, variables: {id: id}}).pipe(
-      map(({data}) => data), // returns a {0|1} element array
-      tap(_ => this.log(`read record with id=${id}`)),
-        catchError(this.handleError<T>(`readById id=${id}`))
-      );
-  }
-
-  /* Read all records whose name contains the search term */
-  readWithTerm<T>(options: GQLOptions, term: string): Observable<T> {
-    if (!term.trim()) {return of();} // if not search term, return empty array of records.
-    return this.apollo.watchQuery<T>({query: options.readWithTerm, variables: {term: term}}).valueChanges.pipe(
+  /* Query (read) record(s), matching variables where necessary */
+  query<T>(query: any, variables: any = {}, description: string = 'read'): Observable<T> {
+    return this.apollo.subscribe({query: query, variables: variables}).pipe(
       map(({data}) => data),
-      tap(_ => this.log(`read records matching "${term}"`)),
-      catchError(this.handleError<T>('readWithTerm'))
+      tap(_ => this.log(`${description} record(s) with ${JSON.stringify(variables)}`)),
+      catchError(this.handleError<T>(`Query=${JSON.stringify(query)} Variables=${JSON.stringify(variables)} Description=${description}`))
     );
   }
 
-  //////// Save methods //////////
-
-  /** Create a new record on the server */
-  create<T>(options: GQLOptions, record: any): Observable<T> {
-    return this.apollo.mutate<T>({mutation: options.create, variables: record}).pipe(
-      map(({data}) => data), // returns a {0|1} element array
-      tap(_ => this.log(`created record with ${JSON.stringify(record)}`)),
-      catchError(this.handleError<T>('create'))
-    );
-  }
-
-  /** Update the record on the server */
-  update<T>(options: GQLOptions, record: any): Observable<T> {
-    return this.apollo.mutate<T>({mutation: options.update, variables: record}).pipe(
+  /** Mutate (create, update or delete) a record on the server */
+  mutate<T>(mutation: any, variables: any = {}, description: string = 'mutate'): Observable<T> {
+    return this.apollo.mutate<T>({mutation: mutation, variables: variables}).pipe(
       map(({data}) => data),
-      tap(_ => this.log(`updated record with ${JSON.stringify(record)}`)),
-      catchError(this.handleError<T>('update'))
-    );
-  }
-
-  /** Delete the record from the server */
-  delete<T>(options: GQLOptions, record: any): Observable<T> {
-    return this.apollo.mutate<T>({mutation: options.delete, variables: record}).pipe(
-      map(({data}) => data),
-      tap(_ => this.log(`deleted record with ${JSON.stringify(record)}`)),
-      catchError(this.handleError<T>('delete'))
-    );
-  }
-
-  /** Delete the record from the server */
-  deleteById<T>(options: GQLOptions, id: any): Observable<T> {
-    return this.apollo.mutate<T>({mutation: options.deleteById, variables: {id: id}}).pipe(
-      map(({data}) => data),
-      tap(_ => this.log(`deleted record with id=${id}`)),
-      catchError(this.handleError<T>('deleteById'))
+      tap(_ => this.log(`${description} record(s) with ${JSON.stringify(variables)}`)),
+      catchError(this.handleError<T>(`Mutate=${JSON.stringify(mutation)} Variables=${JSON.stringify(variables)} Description=${description}`))
     );
   }
 
@@ -122,7 +64,7 @@ export class GraphQLService {
   }
 
   /** Log a GraphQLService message with the MessageService */
-  private log(message: string) {
-    this.messageService.add('GraphQLService: ' + message);
+  log<T>(item: T, prefix: string = ''): T {
+    return this.messageService.log(item, 'GraphQLService: ' + prefix);
   }
 }
